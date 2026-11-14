@@ -202,10 +202,12 @@ class CloudPrinter:
         if isinstance(state, str):
             self._state = state
             self._last_progress = time.monotonic()
-        elif any(key in block for key in ("mc_percent", "percent", "mc_remaining_time", "layer_num")):
+        elif self._state not in ("FINISH", "FAILED", "IDLE"):
             # Incremental reports omit gcode_state; progress means "working".
-            self._state = "RUNNING"
-            self._last_progress = time.monotonic()
+            # Never let a stray mc_percent revive a terminal state.
+            if any(key in block for key in ("mc_percent", "percent", "mc_remaining_time", "layer_num")):
+                self._state = "RUNNING"
+                self._last_progress = time.monotonic()
 
     def _send(self, command: str) -> bool:
         with self._lock:
