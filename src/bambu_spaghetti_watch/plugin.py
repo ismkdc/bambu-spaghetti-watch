@@ -71,6 +71,9 @@ class Bridge:
             "bsw_buffer": ([], ctypes.c_char_p),
             "bsw_clear_buffer": ([], None),
             "bsw_last_error": ([], ctypes.c_char_p),
+            "bsw_connect": ([c, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p,
+                             ctypes.c_char_p, ctypes.c_int], ctypes.c_int),
+            "bsw_connected": ([], ctypes.c_int),
             "bsw_destroy_agent": ([c], ctypes.c_int),
         }
         for name, (args, restype) in decls.items():
@@ -139,6 +142,14 @@ class Bridge:
 
     def clear_buffer(self) -> None:
         self.lib.bsw_clear_buffer()
+
+    def connect(self, agent, serial: str, ip: str, user: str, password: str,
+                use_ssl: bool) -> int:
+        return self.lib.bsw_connect(agent, serial.encode(), ip.encode(),
+                                    user.encode(), password.encode(), 1 if use_ssl else 0)
+
+    def connected(self) -> bool:
+        return bool(self.lib.bsw_connected())
 
     def destroy(self, agent) -> int:
         return self.lib.bsw_destroy_agent(agent)

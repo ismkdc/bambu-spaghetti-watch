@@ -33,7 +33,8 @@ class CloudPrinter:
 
     signed_control = True
 
-    def __init__(self, serial: str, access_code: str = "", model: str = "auto") -> None:
+    def __init__(self, serial: str, access_code: str = "", model: str = "auto",
+                 start_delay: float = 0.0) -> None:
         self.serial = serial
         self.access_code = access_code
         self.model = model
@@ -49,6 +50,7 @@ class CloudPrinter:
         self._sequence = 0
         self._lock = threading.Lock()
         self._seen_report = False
+        self._start_delay = start_delay
         self._last_progress = 0.0
 
     @property
@@ -81,6 +83,9 @@ class CloudPrinter:
         self._thread.start()
 
     def _run(self) -> None:
+        if self._start_delay:
+            # Let a login-item Bambu Studio open and take the cloud session first.
+            time.sleep(self._start_delay)
         while self._running:
             try:
                 self._connect()

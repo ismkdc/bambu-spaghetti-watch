@@ -106,9 +106,13 @@ class MenuBarApp:
             None,
             rumps.MenuItem("Pause print", callback=self._pause),
             rumps.MenuItem("Resume print", callback=self._resume),
+            None,
+            rumps.MenuItem("Pause watching (for Bambu Studio)", callback=self._pause_watching),
+            rumps.MenuItem("Resume watching", callback=self._resume_watching),
         ]
         self._timer = rumps.Timer(self._tick, max(1, int(cfg.interval_sec)))
         self._runner = LoopRunner()
+        self._paused_for_studio = False
         self._set_symbol(symbol_for("idle", "safe"))
 
     def _set_symbol(self, name: str) -> None:
@@ -146,6 +150,29 @@ class MenuBarApp:
         # Notifications belong to the pipeline's action, which is cooldown
         # gated and stays silent for failure_action "none". Firing here would
         # notify on every failing frame instead of once per incident.
+
+    def _pause_watching(self, _sender: Any) -> None:
+        """Release the cloud session so Bambu Studio can start.
+
+        The Bambu cloud allows one session per account at a time; Studio cannot
+        open while this process holds it.
+        """
+        self._paused_for_studio = True
+        try:
+            self._timer.stop()
+        except Exception:
+            pass
+        self.printer.stop()
+        self._status_item.title = "Status: paused (Bambu Studio)"
+
+    def _resume_watching(self, _sender: Any) -> None:
+        self._paused_for_studio = False
+        self.printer.start()
+        try:
+            self._timer.start()
+        except Exception:
+            pass
+        self._status_item.title = "Status: resuming"
 
     def _show_frame(self, _sender: Any) -> None:
         frame = getattr(self.pipeline, "last_frame", None)
