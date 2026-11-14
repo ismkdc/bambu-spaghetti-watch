@@ -112,7 +112,7 @@ You should see `--probe`, `--once`, `--settings` and `--config`.
 The script uses `.venv/bin/python` when it exists, so run it after step 5. It
 builds:
 
-- `bridge/libbswbridge.dylib` — the C ABI used for status, control and the
+- `bridge/libbswbridge.dylib` — the C ABI used for status and the camera
   camera mint
 - `vendor/bambu-headless/h2d_host_identity.dylib` — the executable-path shim
 
@@ -200,7 +200,9 @@ Create `~/.config/bambu-spaghetti-watch/config.json`:
 ```
 
 `stop`, `pause`, `notify` and `none` are accepted. The app signs pause/resume/
-stop itself through the plugin; no Developer Mode toggle is needed.
+stop through the vendored `bambu-headless` bridge over the printer's LAN
+address; no Developer Mode toggle is needed. macOS asks for Local Network
+access the first time — see step 10b.
 
 ## 10b. Local Network permission (macOS 15+)
 

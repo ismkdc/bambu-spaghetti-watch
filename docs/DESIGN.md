@@ -13,9 +13,13 @@ One process, one language (Python 3.12), no extra server.
 ```
               ┌──────────────────────────────┐
    Bambu      │  cloud_printer.py            │  plugin: cloud session
-   cloud ◄────┤  push_status, signed control │  status + pause/resume/stop
+   cloud ◄────┤  push_status                  │  status
               └──────────┬───────────────────┘
                          │ state: RUNNING / FINISH / …
+   printer    ┌──────────▼───────────────────┐
+    LAN ◄─────┤  control.py                  │  bambu-headless, signed
+              └──────────┬───────────────────┘
+                         │ pause / resume / stop
               ┌──────────▼───────────────────┐
    cloud      │  camera/cloud.py             │  mint URL + libBambuSource
  live view ◄──┤  one JPEG / N seconds        │  ffmpeg decodes H.264
@@ -35,7 +39,7 @@ One process, one language (Python 3.12), no extra server.
               └──────────────────────────────┘
 ```
 
-## Cloud session: status and control
+## Cloud session: status; LAN: signed control
 
 Bambu's networking plugin is the user's own client. The app loads it in-process
 through `bridge/libbswbridge.dylib` and runs the same bring-up Studio does:
@@ -47,11 +51,16 @@ The cloud's incremental `push_status` omits `gcode_state`, so the app sends a
 reports, progress fields (`mc_percent`, `layer_num`, `mc_remaining_time`) mean
 "working"; a long gap means idle again.
 
-Control commands are sent through `bambu_network_send_message_to_printer`, which
-the plugin signs with the same device certificate it uses for Studio. This is
-why the app does not need Developer Mode, and why it must run under the
-executable-path shim: the plugin only produces the signed request when
-`_NSGetExecutablePath()` looks like the Studio binary.
+Control is different: the cloud user session does not expose a publish for
+signed `print` frames (`send_message` returns -2, `send_message_to_printer`
+returns -4). The app therefore falls back to the vendored `bambu-headless`
+bridge, which does Studio's certificate bring-up over the printer's local
+session and signs pause/resume/stop there. That path needs the printer's LAN
+address and the macOS Local Network permission.
+
+The shim is still needed for the camera mint and the cloud session: the plugin
+only produces the signed request when `_NSGetExecutablePath()` looks like the
+Studio binary.
 
 The shim is AGPL-3.0 code from `danielyaa5/bambu-headless`; it is interposed
 inside the app process.
@@ -102,5 +111,5 @@ the same plugin path, so no Developer Mode is involved. `pause`, `notify` and
 |---|---|---|
 | Studio plugin ABI changes | status/control/mint stop working | `--probe` names the failing layer; the plugin version is logged |
 | Studio session expires | no status and no mint | open Studio once; `KeepAlive` retries |
-| Cloud control rejects a command | no stop | the app logs the plugin's error code; the printer screen still shows the job |
+| LAN control unreachable | no stop | the app reports the preflight/connection error; camera and status stay cloud |
 | Model false positives | unnecessary stop | the decision layer requires a sustained score; set `failure_action: notify` to observe first |

@@ -3,9 +3,10 @@
 A macOS menu bar app that watches a Bambu Lab printer, runs Obico's failure
 model locally, and **stops** the print when the failure signal is sustained.
 
-No Home Assistant, no extra server, no Obico account. Status, camera and
-control all go through Bambu's own cloud session, using the copy of Bambu Studio
-already on your Mac. Detection runs in-process in ~30 ms.
+No Home Assistant, no extra server, no Obico account. Status and camera go
+through Bambu's own cloud session; signed pause/resume/stop use the printer's
+LAN address through the same plugin, because the cloud client does not expose
+that publish. Detection runs in-process in ~30 ms.
 
 ## What it does
 
@@ -29,17 +30,18 @@ The model was checked against real labelled failure frames: all seven
 | Layer | Transport | Used for |
 |---|---|---|
 | Status | Bambu cloud session | `gcode_state`, progress, job name |
-| Control | Bambu cloud session (signed) | pause / resume / stop |
+| Control | printer LAN, signed by the plugin | pause / resume / stop |
 | Camera | Bambu cloud live view (TUTK) | one JPEG every 5 s |
 
-The app loads the networking plugin that Bambu Studio installs, signs in with
-the user's existing Studio session, and talks to the printer through Bambu's
-cloud. It does not need the printer's LAN address, and it works from another
-network as well as from home.
+The app loads the networking plugin that Bambu Studio installs and signs in with
+the user's existing Studio session. Status and camera work from any network.
+Signed control needs the printer's LAN address (or a VPN) and the macOS Local
+Network permission — see [INSTALL.md](INSTALL.md) step 10b.
 
 Control commands are signed by the plugin because firmware since 2025 rejects
-unsigned commands with `84033543 mqtt message verify failed`. The app never
-implements that signing itself.
+unsigned commands with `84033543 mqtt message verify failed`. The vendored
+`bambu-headless` bridge performs that bring-up over the printer's local session;
+the app never implements the signing itself.
 
 Nothing from Bambu is redistributed. The app loads the plugin and libraries
 already installed by Bambu Studio.
@@ -151,7 +153,7 @@ installed.
 ## Credits and licence
 
 - Detection model and decision maths: [Obico](https://github.com/TheSpaghettiDetective/obico-server)
-- Executable-path shim and signed-control reference:
+- Executable-path shim and the signed-control bridge:
   [danielyaa5/bambu-headless](https://github.com/danielyaa5/bambu-headless)
 - Protocol details: [bambuddy](https://github.com/maziggy/bambuddy) and
   [ClusterM/open-bamboo-networking](https://github.com/ClusterM/open-bamboo-networking)
