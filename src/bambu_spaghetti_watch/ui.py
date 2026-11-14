@@ -150,7 +150,11 @@ class MenuBarApp:
     def _show_frame(self, _sender: Any) -> None:
         frame = getattr(self.pipeline, "last_frame", None)
         if not frame:
-            self._rumps.alert("No frame yet", "Turn on LAN Only Liveview on the printer.")
+            self._rumps.alert(
+                "No frame yet",
+                "The cloud live view returned no frame. Run `bambu-watch --probe` "
+                "to see whether the MQTT, camera or model layer failed.",
+            )
             return
         FRAME_DIR.mkdir(parents=True, exist_ok=True)
         path = FRAME_DIR / "last-frame.jpg"

@@ -2,7 +2,7 @@
 
 Two sources, matched on the serial number:
 
-- **SSDP** on UDP 2021 gives the printer's LAN address, model code and name.
+- **SSDP** on UDP 2021 gives the printer's local address, model code and name.
   Bambu printers answer a plain UPnP M-SEARCH; no credentials are needed.
 - **Bambu Studio's** ``BambuStudio.conf`` holds ``{"access_code": {serial: code}}``
   in clear text once the user has added the printer there.
@@ -23,6 +23,9 @@ from urllib.parse import urlparse
 STUDIO_CONF = (
     Path.home() / "Library" / "Application Support" / "BambuStudio" / "BambuStudio.conf"
 )
+
+# Last printer that answered, so a missed SSDP round does not stop the app.
+CACHE = Path.home() / "Library" / "Caches" / "bambu-watch" / "last_printer.json"
 
 SSDP_ADDR = ("239.255.255.250", 2021)
 SSDP_TARGETS = ("239.255.255.250", "255.255.255.255")
@@ -97,8 +100,38 @@ def read_studio_access_codes(path: Path = STUDIO_CONF) -> dict[str, str]:
     return {str(k): str(v) for k, v in codes.items() if isinstance(v, str) and v}
 
 
+def _cache_read() -> PrinterInfo | None:
+    try:
+        data = json.loads(CACHE.read_text())
+    except (OSError, ValueError):
+        return None
+    host = str(data.get("host", "")).strip()
+    serial = str(data.get("serial", "")).strip()
+    if not host or not serial:
+        return None
+    return PrinterInfo(host=host, serial=serial, model=str(data.get("model", "")))
+
+
+def _cache_write(info: PrinterInfo) -> None:
+    try:
+        CACHE.parent.mkdir(parents=True, exist_ok=True)
+        CACHE.write_text(
+            json.dumps({"host": info.host, "serial": info.serial, "model": info.model})
+        )
+    except OSError:
+        pass
+
+
+def _reachable(host: str, port: int = 8883, timeout: float = 1.0) -> bool:
+    try:
+        socket.create_connection((host, port), timeout=timeout).close()
+        return True
+    except OSError:
+        return False
+
+
 def discover(timeout: float = 3.0) -> list[PrinterInfo]:
-    """Ask the LAN for Bambu printers. Returns unique devices by serial."""
+    """Ask the local network for Bambu printers. Returns unique devices by serial."""
     socket_ = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     socket_.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     socket_.settimeout(0.5)
@@ -155,8 +188,23 @@ def resolve(cfg: Any) -> Resolved:
 
     devices: list[PrinterInfo] = []
     if not host or not serial:
-        devices = discover()
-        chosen = choose_device(devices, serial or None)
+        chosen = None
+        # SSDP is UDP and lossy on busy networks; a few rounds plus the last
+        # known printer keeps a missed packet from stopping the app.
+        for _attempt in range(3):
+            devices = discover(timeout=2.5)
+            chosen = choose_device(devices, serial or None)
+            if chosen is not None:
+                break
+            cached = _cache_read()
+            if cached is not None and _reachable(cached.host):
+                chosen = cached
+                break
+            time.sleep(0.5)
+        if chosen is None:
+            cached = _cache_read()
+            if cached is not None and _reachable(cached.host):
+                chosen = cached
         if chosen is None and not host:
             if not devices:
                 raise BootstrapError(
@@ -183,4 +231,5 @@ def resolve(cfg: Any) -> Resolved:
             "no access code: add the printer to Bambu Studio, or set 'access_code'"
         )
 
+    _cache_write(PrinterInfo(host=host, serial=serial, model=model))
     return Resolved(host=host, serial=serial, access_code=access, model=model)

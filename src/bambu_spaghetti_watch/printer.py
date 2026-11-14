@@ -3,7 +3,7 @@
 Wire facts (verified against bambuddy's ``services/bambu_mqtt.py`` and against
 Bambu Studio's networking plugin strings):
 
-- LAN broker: ``ssl://<ip>:8883``, username ``bblp``, password = access code
+- Printer broker: ``ssl://<ip>:8883``, username ``bblp``, password = access code
 - topics: ``device/<serial>/report`` (subscribe), ``device/<serial>/request``
 - pause is ``{"print": {"command": "pause", "sequence_id": "0"}}``
 

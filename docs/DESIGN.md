@@ -12,7 +12,7 @@ One process, one language (Python 3.12), no extra server.
 
 ```
               ┌──────────────────────────────┐
-   MQTT       │  printer.py                  │  LAN ssl://<ip>:8883
+   MQTT       │  printer.py                  │  ssl://<ip>:8883
   (8883) ◄────┤  connect, subscribe, publish │  device/<sn>/report|request
               └──────────┬───────────────────┘
                          │ state: RUNNING / idle
@@ -37,7 +37,7 @@ One process, one language (Python 3.12), no extra server.
 
 ## Camera: cloud live view
 
-The printer's own LAN camera paths are model-specific (`:6000` chamber image on
+The printer's own local camera paths are model-specific (`:6000` chamber image on
 P1/A1, RTSPS `:322` on X1/P2S) and do not exist remotely. Bambu's cloud live
 view does, and it is the same tunnel Bambu Handy uses.
 
@@ -57,7 +57,7 @@ request.
 
 ## Control: signed MQTT
 
-Firmware since 2025 verifies control commands. Raw LAN MQTT `pause` is rejected
+Firmware since 2025 verifies control commands. Raw MQTT `pause` is rejected
 with `84033543 mqtt message verify failed`. The vendored `bambu-headless`
 bridge performs Studio's certificate bring-up and dispatches the signed
 command. `cloud_control.py` shells out to it.

@@ -13,6 +13,13 @@
 	<true/>
 	<key>KeepAlive</key>
 	<true/>
+	<!-- launchd's PATH does not include Homebrew, and the camera decodes H.264
+	     through ffmpeg. Keep both Homebrew prefixes. -->
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
 	<key>StandardOutPath</key>
 	<string>/Users/ismkdc/Library/Logs/bambu-spaghetti-watch/out.log</string>
 	<key>StandardErrorPath</key>

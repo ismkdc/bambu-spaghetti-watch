@@ -119,7 +119,7 @@ async def probe(cfg: Config) -> int:
         pass
 
     if printer.state is None:
-        print("mqtt      : no status received — check host, access code and LAN mode")
+        print("mqtt      : no status received — check host and access code")
         printer.stop()
         return 1
 
@@ -187,7 +187,7 @@ async def settings(cfg: Config) -> int:
 
     blocks = summarise_settings(printer.last_raw)
     if not blocks:
-        print("no settings received — check host, access code and LAN mode")
+        print("no settings received — check host and access code")
         printer.stop()
         return 1
 
@@ -209,7 +209,7 @@ async def once(cfg: Config) -> int:
     printer = PrinterClient(cfg.host, cfg.serial, cfg.access_code)
     printer.start()
     if not await wait_for_report(printer, PROBE_WAIT_SECONDS):
-        print("no status received — check host, access code and LAN mode")
+        print("no status received — check host and access code")
         printer.stop()
         return 1
 

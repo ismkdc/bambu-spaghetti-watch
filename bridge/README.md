@@ -50,9 +50,9 @@ camera_probe.py  ->  libbswbridge.dylib  ->  libbambu_networking.dylib
 The URL is cached in `~/Library/Caches/bambu-watch/liveview_url.txt` for 30
 minutes and re-minted on failure.
 
-`libBambuSource` may report `Mode=LAN` in its own log when the printer happens
-to be on the same network. That is the library's transport choice for a
-TUTK ticket; the URL is still the cloud one and works remotely.
+`libBambuSource` may pick a direct local transport when the printer happens to
+be on the same network. That is the library's choice for a TUTK ticket; the URL
+is still the cloud one and works remotely.
 
 ## Signed control
 
@@ -78,5 +78,5 @@ without Developer Mode.
 ## Privacy
 
 The app never sends frames anywhere. Detection is local. The only network calls
-are to the printer on the LAN (status/control) and to Bambu's cloud for the
+are to the printer on the local network (status/control) and to Bambu's cloud for the
 live-view ticket, using the user's existing Studio session.

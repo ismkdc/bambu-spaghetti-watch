@@ -127,7 +127,7 @@ def self_attach_flag_hook() -> object | None:
     return session
 
 
-def mint(serial: str, *, lan_only: int = 0, dev_ver: str = "01.03.00.00",
+def mint(serial: str, *, dev_ver: str = "01.03.00.00",
          protocols: str = '"tutk","agora"', timeout: float = 40.0,
          wait: float = 0.5, cert_tries: int = 1, force_flag: bool = True,
          skip_cert: bool = False, connect: bool = False,
@@ -194,7 +194,7 @@ def mint(serial: str, *, lan_only: int = 0, dev_ver: str = "01.03.00.00",
         if not skip_cert:
             installed = False
             for attempt in range(1, max(1, cert_tries) + 1):
-                b.lib.bsw_install_device_cert(agent, serial.encode(), lan_only)
+                b.lib.bsw_install_device_cert(agent, serial.encode(), 0)
                 deadline = time.monotonic() + wait
                 while time.monotonic() < deadline:
                     if b.lib.bsw_buffer_contains(b"device_cert_installed"):
@@ -227,7 +227,6 @@ def mint(serial: str, *, lan_only: int = 0, dev_ver: str = "01.03.00.00",
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--serial", default=None)
-    ap.add_argument("--lan-only", type=int, choices=(0, 1), default=0)
     ap.add_argument("--dev-ver", default="01.03.00.00")
     ap.add_argument("--protocols", default='"tutk","agora"')
     ap.add_argument("--timeout", type=float, default=40.0)
@@ -250,7 +249,7 @@ def main() -> int:
         print(f"pid      : {os.getpid()}", flush=True)
         time.sleep(args.pause)
 
-    url = mint(serial, lan_only=args.lan_only, dev_ver=args.dev_ver,
+    url = mint(serial, dev_ver=args.dev_ver,
                protocols=args.protocols, timeout=args.timeout, wait=args.wait,
                cert_tries=args.cert_tries, force_flag=not args.no_force_flag,
                skip_cert=args.skip_cert, connect=args.connect, ip=args.ip,

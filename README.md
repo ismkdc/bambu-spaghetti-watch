@@ -26,7 +26,7 @@ The model was checked against real labelled failure frames: all seven
 
 | Layer | Transport | Used for |
 |---|---|---|
-| Status / control | printer LAN MQTT `:8883` | `gcode_state`, pause/resume/stop |
+| Status / control | printer MQTT `:8883` | `gcode_state`, pause/resume/stop |
 | Camera | Bambu cloud live-view (TUTK) | one JPEG every 5 s |
 
 Control commands are signed by Studio's networking plugin through the vendored
@@ -34,9 +34,9 @@ Control commands are signed by Studio's networking plugin through the vendored
 firmware since 2025 rejects unsigned commands with `84033543 mqtt message verify
 failed`.
 
-The camera needs no LAN live-view setting. The app asks Studio's plugin for a
+The camera needs no printer-side live-view setting. The app asks Studio's plugin for a
 live-view URL (the same ticket Bambu Handy uses) and hands it to
-`libBambuSource`. It works on the office LAN and from a remote network alike.
+`libBambuSource`. It works locally and remotely alike.
 
 Nothing from Bambu is redistributed. The app loads the plugin and libraries
 already installed by Bambu Studio.
@@ -48,9 +48,9 @@ already installed by Bambu Studio.
 - Xcode Command Line Tools (`xcode-select --install`)
 - `ffmpeg` and `nlohmann-json` (`brew install ffmpeg nlohmann-json`)
 - Bambu Studio installed, signed in, with the printer **bound to your Bambu
-  account** (the camera is Bambu's cloud live view; a LAN-only printer has no
-  camera here)
-- The printer reachable on the LAN for status and control (directly or over VPN)
+  account** (the camera is Bambu's cloud live view; a printer that is not
+  cloud-bound has no camera here)
+- The printer reachable for status and control (directly or over VPN)
 
 ## Install
 
@@ -68,8 +68,8 @@ curl -L -o src/bambu_spaghetti_watch/models/model-weights.darknet \
 
 ## Configure
 
-Normally you configure nothing. At startup the app asks the LAN for Bambu
-printers over SSDP, then reads the access code for the matching serial from
+Normally you configure nothing. At startup the app asks the local network for
+Bambu printers over SSDP, then reads the access code for the matching serial from
 Bambu Studio's own config:
 
 ```
@@ -127,7 +127,7 @@ launchctl load ~/Library/LaunchAgents/io.github.bambu-spaghetti-watch.plist
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `no status received` | wrong access code, or printer not in LAN mode | check the code on the printer screen |
+| `no status received` | wrong access code, or the printer is not reachable locally | check the code on the printer screen |
 | `no status received` as a discovery error | several printers answered SSDP | set `serial` in the config |
 | `camera error: ... bridge ...` | `bridge/` was not built or moved | run `./bridge/build.sh` |
 | `cloud camera could not mint a live-view URL` | Studio session expired, printer offline, not cloud-bound, or the plugin ABI changed | open Bambu Studio once, confirm the printer is online and bound to your account, re-run `--probe` |

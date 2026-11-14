@@ -62,14 +62,14 @@ So:
 1. Install Bambu Studio.
 2. Sign in to your Bambu account.
 3. Add the P1S **and confirm it appears in your Bambu account** (cloud binding).
-   The camera is Bambu's cloud live view; a LAN-only printer has no camera in
-   this app.
+   The camera is Bambu's cloud live view; a printer that is not cloud-bound
+   has no camera in this app.
 4. Open the printer's **Device** page and the **camera** once, to confirm the
    live view works. This also proves the cloud session is healthy.
 
-You do not need **LAN Only Liveview** for the camera. You do need the printer
-to be reachable on the LAN (or over VPN) for status and pause/resume, and it
-must be bound to your Bambu account for the camera.
+No camera setting on the printer is needed. The printer must be reachable for
+status and pause/resume, and it must be bound to your Bambu account for the
+camera.
 
 Verify the files exist:
 
@@ -164,7 +164,7 @@ What each line means:
 |---|---|---|
 | `printer` | SSDP found the printer and the serial matched Studio's config | check the printer is on and on the same network |
 | `access` | the access code came from `BambuStudio.conf` | see Troubleshooting |
-| `mqtt` | LAN `:8883` accepted `bblp` + access code | wrong code, or the printer is not in LAN mode |
+| `mqtt` | printer `:8883` accepted `bblp` + access code | wrong code, or the printer is not reachable locally |
 | `camera` | the cloud URL was minted and `libBambuSource` returned a JPEG | first run takes ~20 s; see Troubleshooting |
 | `model` | the detector ran | missing weights, or OpenCV < 5 |
 
@@ -226,10 +226,10 @@ launchctl load ~/Library/LaunchAgents/io.github.bambu-spaghetti-watch.plist
 | Symptom | Fix |
 |---|---|
 | `cannot read ~/Library/Application Support/BambuStudio/BambuStudio.conf` | open Bambu Studio, sign in, add the printer |
-| `no status received` | wrong access code, or the printer is not in LAN mode; check the code on the printer screen |
+| `no status received` | wrong access code, or the printer is not reachable locally; check the code on the printer screen |
 | `discovery failed: several printers answered SSDP` | set `serial` in the config |
 | `camera error: ... bridge ...` | run `./bridge/build.sh` |
-| `cloud camera could not mint a live-view URL` | open Bambu Studio once, confirm the printer is online **and bound to your Bambu account** (not LAN-only), then re-run `--probe` |
+| `cloud camera could not mint a live-view URL` | open Bambu Studio once, confirm the printer is online **and bound to your Bambu account** (not local-only), then re-run `--probe` |
 | `cloud camera returned no frame` | delete `~/Library/Caches/bambu-watch/liveview_url.txt` and retry |
 | `Address already in use` on `:8883` | another MQTT client is connected with the same account; close it |
 | Frequent false positives | lower `sensitivity` to `low` |
