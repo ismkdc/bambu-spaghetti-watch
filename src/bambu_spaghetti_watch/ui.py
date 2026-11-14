@@ -120,6 +120,38 @@ class MenuBarApp:
         )
         self._studio_watcher.start()
 
+    def _set_symbol(self, name: str) -> None:
+        """Swap the status item image for an SF Symbol, template-tinted."""
+        try:
+            from AppKit import NSImage
+
+            image = NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, None)
+            if image is not None:
+                image.setTemplate_(True)
+                self._app._icon = image
+                self._app._nsapp.nsstatusitem.button().setImage_(image)
+        except Exception:  # symbol unavailable on this macOS: text glyph stays
+            LOGGER.debug("could not set status symbol %s", name, exc_info=True)
+
+    def _tick(self, _sender: Any) -> None:
+        try:
+            verdict = self._runner.run(
+                self.pipeline.step(), timeout=max(30.0, self.cfg.interval_sec * 4)
+            )
+        except Exception as err:  # a dead camera must not kill the menu bar
+            LOGGER.exception("detection step failed")
+            self._app.title = ICONS["error"]
+            self._status_item.title = f"Status: error ({err})"
+            return
+
+        status = "idle" if verdict == "idle" else "watching"
+        if verdict == "no_frame":
+            status = "error"
+
+        self._set_symbol(symbol_for(status, verdict))
+        self._status_item.title = f"Status: {verdict}"
+        self._score_item.title = f"Failure score: {self.pipeline.decision.last.score:.2f}"
+
     def _watch_studio(self) -> None:
         """Release the cloud session only while Bambu Studio is starting.
 
