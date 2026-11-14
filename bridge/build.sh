@@ -11,7 +11,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-PYTHON="${PYTHON:-python3}"
+if [[ -x "$ROOT/.venv/bin/python" ]]; then
+  PYTHON="$ROOT/.venv/bin/python"
+else
+  PYTHON="${PYTHON:-python3}"
+fi
+
+if ! "$PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'; then
+  echo "error: $PYTHON is older than 3.10; create .venv with Python 3.12 first" >&2
+  exit 1
+fi
 
 echo "==> building bridge/libbswbridge.dylib"
 clang++ -std=c++17 -O2 -shared -fPIC -o bridge/libbswbridge.dylib bridge/bsw_bridge.cpp

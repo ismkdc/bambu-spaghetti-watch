@@ -37,6 +37,9 @@ Then:
 brew install python@3.12 ffmpeg nlohmann-json
 ```
 
+> On an Intel Mac, Homebrew lives in `/usr/local`, so use
+> `/usr/local/bin/python3.12` everywhere below.
+
 Check:
 
 ```bash
@@ -78,6 +81,7 @@ If any is missing, update Bambu Studio and open the printer once more.
 ## 4. Clone the project
 
 ```bash
+mkdir -p ~/Projects
 cd ~/Projects
 git clone https://github.com/ismkdc/bambu-spaghetti-watch.git
 cd bambu-spaghetti-watch
@@ -105,7 +109,8 @@ You should see `--probe`, `--once`, `--settings` and `--config`.
 ./bridge/build.sh
 ```
 
-This builds:
+The script uses `.venv/bin/python` when it exists, so run it after step 5. It
+builds:
 
 - `bridge/libbswbridge.dylib` — the C ABI used to mint the camera URL
 - `vendor/bambu-headless/h2d_network_bridge` — signed pause/resume
