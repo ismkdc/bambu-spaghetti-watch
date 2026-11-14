@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bambu-spaghetti-watch"
+version = "0.1.0"
+description = "macOS menu bar app that detects print failures on Bambu Lab printers"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.5",
+    # Must stay < 5: cv2.dnn.readNetFromDarknet was removed in OpenCV 5.0,
+    # and the detector loads Obico's darknet weights through it.
+    "opencv-python-headless>=4.14,<5",
+    "paho-mqtt>=2.2",
+    # The cloud camera mints its live-view URL by self-attaching Frida.
+    "frida>=17",
+    "rumps>=0.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=9", "pytest-asyncio>=1.5"]
+
+[project.scripts]
+bambu-watch = "bambu_spaghetti_watch.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+bambu_spaghetti_watch = ["models/*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

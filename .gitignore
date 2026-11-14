@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.superpowers/
+*.egg-info/
+**/models/*.darknet
+**/models/*.onnx
+**/models/*.rknn
+
+vendor/bambu-headless/h2d_network_bridge
+vendor/bambu-headless/*.dylib
+vendor/bambu-headless/*.so
+bridge/*.dylib

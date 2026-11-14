@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>io.github.bambu-spaghetti-watch</string>
+	<!-- Absolute paths: launchd does not expand ~. Edit all three before loading. -->
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/ismkdc/Projects/bambu-spaghetti-watch/.venv/bin/bambu-watch</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>/Users/ismkdc/Library/Logs/bambu-spaghetti-watch/out.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/ismkdc/Library/Logs/bambu-spaghetti-watch/err.log</string>
+</dict>
+</plist>
