@@ -81,44 +81,64 @@ class CloudPrinter:
         self._thread.start()
 
     def _run(self) -> None:
-        try:
-            bridge = plugin.Bridge()
-            self._bridge = bridge
-            LOGGER.info("plugin %s", bridge.version())
-            agent = bridge.create_agent()
-            if not agent:
-                self.last_error = f"create_agent failed: {bridge.err()}"
-                return
-            self._agent = agent
-            LOGGER.info("callbacks=%s", bridge.install_callbacks(agent))
-            bridge.setup_cloud(agent)
-            from bambu_spaghetti_watch.bootstrap import read_studio_slicer_uuid
+        while self._running:
+            try:
+                self._connect()
+                bridge = self._bridge
+                if bridge is not None:
+                    self._poll(bridge)
+            except Exception as err:  # keep the app alive; retry shortly
+                self.last_error = str(err)
+                LOGGER.warning("cloud printer: %s; retrying in 5s", err)
+            finally:
+                self._teardown()
+            if self._running:
+                time.sleep(5.0)
 
-            bridge.set_headers(agent, read_studio_slicer_uuid())
-            bridge.init_log(agent)
-            LOGGER.info("start=%s", bridge.start(agent))
-            LOGGER.info("connect_server=%s", bridge.connect_server(agent))
+    def _connect(self) -> None:
+        bridge = plugin.Bridge()
+        self._bridge = bridge
+        LOGGER.info("plugin %s", bridge.version())
+        agent = bridge.create_agent()
+        if not agent:
+            raise RuntimeError(f"create_agent failed: {bridge.err()}")
+        self._agent = agent
+        LOGGER.info("callbacks=%s", bridge.install_callbacks(agent))
+        bridge.setup_cloud(agent)
+        from bambu_spaghetti_watch.bootstrap import read_studio_slicer_uuid
 
-            deadline = time.monotonic() + CONNECT_TIMEOUT
-            while self._running and time.monotonic() < deadline:
-                if bridge.server_connected(agent) and bridge.is_user_login(agent):
-                    break
-                time.sleep(POLL_SECONDS)
+        bridge.set_headers(agent, read_studio_slicer_uuid())
+        bridge.init_log(agent)
+        LOGGER.info("start=%s", bridge.start(agent))
+        LOGGER.info("connect_server=%s", bridge.connect_server(agent))
 
-            LOGGER.info("connected: server=%s login=%s",
-                        bridge.server_connected(agent), bridge.is_user_login(agent))
-            self._read_device_table(bridge, agent)
-            LOGGER.info("select=%s", bridge.select_machine(agent, self.serial))
-            LOGGER.info("cert=%s", bridge.install_device_cert(agent, self.serial))
-            # Incremental push_status omits unchanged fields; ask for a full one.
-            bridge.send(agent, self.serial,
-                        '{"pushing":{"sequence_id":"0","command":"pushall","version":1,"push_target":1}}',
-                        1, 0)
-            LOGGER.info("polling")
-            self._poll(bridge)
-        except Exception as err:  # keep the app alive; the UI shows the error
-            LOGGER.exception("cloud printer failed")
-            self.last_error = str(err)
+        deadline = time.monotonic() + CONNECT_TIMEOUT
+        while self._running and time.monotonic() < deadline:
+            if bridge.server_connected(agent) and bridge.is_user_login(agent):
+                break
+            time.sleep(POLL_SECONDS)
+        if not (bridge.server_connected(agent) and bridge.is_user_login(agent)):
+            raise RuntimeError("cloud session did not connect")
+
+        LOGGER.info("connected: server=True login=True")
+        self._read_device_table(bridge, agent)
+        LOGGER.info("select=%s", bridge.select_machine(agent, self.serial))
+        LOGGER.info("cert=%s", bridge.install_device_cert(agent, self.serial))
+        time.sleep(2.0)  # let the certificate exchange settle
+        # Incremental push_status omits unchanged fields; ask for a full one.
+        bridge.send(agent, self.serial,
+                    '{"pushing":{"sequence_id":"0","command":"pushall","version":1,"push_target":1}}',
+                    1, 0)
+        LOGGER.info("polling")
+
+    def _teardown(self) -> None:
+        if self._agent is not None and self._bridge is not None:
+            try:
+                self._bridge.destroy(self._agent)
+            except Exception:
+                pass
+        self._agent = None
+        self._bridge = None
 
     def _read_device_table(self, bridge: plugin.Bridge, agent) -> None:
         body = bridge.user_print_info(agent)
@@ -191,10 +211,4 @@ class CloudPrinter:
     def stop(self) -> None:
         self._running = False
         if self._thread is not None:
-            self._thread.join(timeout=3)
-        if self._agent is not None and self._bridge is not None:
-            try:
-                self._bridge.destroy(self._agent)
-            except Exception:
-                pass
-            self._agent = None
+            self._thread.join(timeout=6)
