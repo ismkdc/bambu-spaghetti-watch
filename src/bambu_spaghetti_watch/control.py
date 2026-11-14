@@ -7,6 +7,7 @@ bring-up Studio does, while status and camera stay on the cloud.
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -17,6 +18,31 @@ CLI = Path(__file__).resolve().parents[2] / "vendor" / "bambu-headless" / "bambu
 
 def available() -> bool:
     return CLI.exists()
+
+
+def job_name(host: str, serial: str, timeout: int = 90) -> str | None:
+    """Fetch the current job name over the LAN, for the control preflight."""
+    if not available() or not host:
+        return None
+    python = os.environ.get("BSW_PYTHON", sys.executable)
+    command = [python, str(CLI), "status", "--host", host,
+               "--serial", serial, "--json"]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True,
+                                timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    for line in reversed((result.stdout or "").splitlines()):
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            data = json.loads(line)
+        except ValueError:
+            continue
+        job = data.get("job")
+        return job if isinstance(job, str) and job else None
+    return None
 
 
 def run(action: str, host: str, serial: str, job: str,

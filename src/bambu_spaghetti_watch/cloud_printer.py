@@ -198,7 +198,11 @@ class CloudPrinter:
         block = data.get("print")
         if not isinstance(block, dict):
             return
-        self.last_raw = data
+        # Incremental reports carry only changed fields; merge instead of
+        # replacing, so subtask_name from the full pushall survives.
+        merged = dict(self.last_raw.get("print") or {})
+        merged.update(block)
+        self.last_raw = {**data, "print": merged}
         state = block.get("gcode_state")
         if isinstance(state, str):
             self._state = state
@@ -227,8 +231,10 @@ class CloudPrinter:
         """Signed control falls back to the local session the plugin exposes."""
         from bambu_spaghetti_watch import control
 
-        ok, message = control.run(action, self.host, self.serial,
-                                  self.job_name or "")
+        job = self.job_name
+        if not job:
+            job = control.job_name(self.host, self.serial) or ""
+        ok, message = control.run(action, self.host, self.serial, job)
         self.last_error = None if ok else message
         return ok
 
