@@ -28,7 +28,7 @@ class Config:
     interval_sec: int = 5
     model: str = "auto"
     camera_mode: str = "cloud"
-    failure_action: str = "stop"
+    failure_action: str = "notify"
     sensitivity: str = "medium"
     model_dir: Path | None = None
 
@@ -50,7 +50,7 @@ def load_config(path: Path) -> Config:
     serial = _text(data, "serial")
     access_code = _text(data, "access_code")
 
-    failure_action = data.get("failure_action", "stop")
+    failure_action = data.get("failure_action", "notify")
     if failure_action not in FAILURE_ACTIONS:
         raise ValueError(
             f"failure_action must be one of {FAILURE_ACTIONS}, got {failure_action!r}"
