@@ -202,6 +202,24 @@ Create `~/.config/bambu-spaghetti-watch/config.json`:
 `stop`, `pause`, `notify` and `none` are accepted. The app signs pause/resume/
 stop itself through the plugin; no Developer Mode toggle is needed.
 
+## 10b. Local Network permission (macOS 15+)
+
+Signed pause/resume goes over the printer's LAN address, and macOS asks for
+Local Network access. A LaunchAgent started by launchd cannot show that prompt,
+so it is denied silently (`No route to host`). Two ways to run it with access:
+
+```bash
+# A. from Terminal, which already has the permission
+./bambu-watch.command
+
+# B. grant the app the permission once, then keep the LaunchAgent
+#    System Settings -> Privacy & Security -> Local Network
+#    enable Python (or the app) if it is listed
+```
+
+If you use A at login, add `bambu-watch.command` to System Settings ->
+General -> Login Items and unload the LaunchAgent so only one copy runs.
+
 ## 11. Autostart at login (optional)
 
 ```bash
