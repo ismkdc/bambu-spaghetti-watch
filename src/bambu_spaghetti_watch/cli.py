@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from bambu_spaghetti_watch import host_identity
-from bambu_spaghetti_watch.bootstrap import BootstrapError, resolve_cloud
+from bambu_spaghetti_watch.bootstrap import BootstrapError, resolve_cloud, resolve_lan_host
 from bambu_spaghetti_watch.camera import make_camera
 from bambu_spaghetti_watch.camera.base import CameraNotConfigured
 from bambu_spaghetti_watch.cloud_printer import CloudPrinter
@@ -110,7 +110,7 @@ async def probe(cfg: Config) -> int:
     print(f"camera    : {cfg.camera_mode}")
     print()
 
-    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model)
+    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model, host=cfg.host)
     printer.start()
     print("cloud     : connecting to the Bambu account ...")
 
@@ -173,7 +173,7 @@ async def probe(cfg: Config) -> int:
 
 
 async def settings(cfg: Config) -> int:
-    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model)
+    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model, host=cfg.host)
     printer.start()
 
     deadline = time.monotonic() + SETTINGS_WAIT_SECONDS
@@ -203,7 +203,7 @@ async def once(cfg: Config) -> int:
         print(f"missing model files in {weights_path.parent}")
         return 2
 
-    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model)
+    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model, host=cfg.host)
     printer.start()
     if not await wait_for_report(printer, PROBE_WAIT_SECONDS):
         print("no status received — check the Bambu Studio session")
@@ -235,6 +235,7 @@ def _with_cloud_config(cfg: Config) -> Config:
     resolved = resolve_cloud(cfg)
     return replace(
         cfg,
+        host=resolve_lan_host(resolved.serial),
         serial=resolved.serial,
         access_code=resolved.access_code,
         model=resolved.model,
@@ -283,7 +284,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"missing model files in {weights_path.parent}")
         return 2
 
-    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model)
+    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model, host=cfg.host)
     printer.start()
 
     pipeline = Pipeline(

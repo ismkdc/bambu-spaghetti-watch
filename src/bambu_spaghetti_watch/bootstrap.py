@@ -258,6 +258,19 @@ def resolve(cfg: Any) -> Resolved:
     return Resolved(host=host, serial=serial, access_code=access, model=model)
 
 
+def resolve_lan_host(serial: str = "") -> str:
+    """LAN address for signed control, from the cache or one SSDP round."""
+    cached = _cache_read()
+    if cached and (not serial or cached.serial == serial) and _reachable(cached.host):
+        return cached.host
+    devices = discover(timeout=3.0)
+    chosen = choose_device(devices, serial or None)
+    if chosen is not None:
+        _cache_write(chosen)
+        return chosen.host
+    return ""
+
+
 def resolve_cloud(cfg: Any) -> Resolved:
     """Cloud-only resolution: serial and model from the config or Studio.
 

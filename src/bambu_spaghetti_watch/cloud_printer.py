@@ -38,10 +38,11 @@ class CloudPrinter:
     signed_control = True
 
     def __init__(self, serial: str, access_code: str = "", model: str = "auto",
-                 start_delay: float = 0.0) -> None:
+                 start_delay: float = 0.0, host: str = "") -> None:
         self.serial = serial
         self.access_code = access_code
         self.model = model
+        self.host = host
         self.last_raw: dict[str, Any] = {}
         self.last_error: str | None = None
 
@@ -219,14 +220,23 @@ class CloudPrinter:
             )
             return self._bridge.send(self._agent, self.serial, payload) == 0
 
+    def _lan(self, action: str) -> bool:
+        """Signed control falls back to the local session the plugin exposes."""
+        from bambu_spaghetti_watch import control
+
+        ok, message = control.run(action, self.host, self.serial,
+                                  self.job_name or "")
+        self.last_error = None if ok else message
+        return ok
+
     def pause(self) -> bool:
-        return self._send("pause")
+        return self._send("pause") or self._lan("pause")
 
     def resume(self) -> bool:
-        return self._send("resume")
+        return self._send("resume") or self._lan("resume")
 
     def stop_print(self) -> bool:
-        return self._send("stop")
+        return self._send("stop") or self._lan("cancel")
 
     def stop(self) -> None:
         self._running = False
