@@ -36,10 +36,12 @@ def send_control(printer: Any, control: Control | None, action: str) -> tuple[bo
     verifies, the signed plugin path is the only correct one.
     """
     if getattr(printer, "signed_control", False):
-        if action == "pause":
-            return (True, "") if printer.pause() else (False, "cloud pause was rejected")
-        if action == "resume":
-            return (True, "") if printer.resume() else (False, "cloud resume was rejected")
+        if action in ("pause", "resume"):
+            ok = printer.pause() if action == "pause" else printer.resume()
+            if ok:
+                return True, ""
+            return False, (getattr(printer, "last_error", None)
+                           or f"{action} was rejected")
         return False, f"unsupported action {action!r}"
 
     if getattr(printer, "developer_mode", None) is False:

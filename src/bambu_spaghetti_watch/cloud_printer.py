@@ -218,7 +218,10 @@ class CloudPrinter:
             payload = json.dumps(
                 {"print": {"command": command, "sequence_id": str(self._sequence)}}
             )
-            return self._bridge.send(self._agent, self.serial, payload) == 0
+            ok = self._bridge.send(self._agent, self.serial, payload) == 0
+            if ok:
+                self.last_error = None
+            return ok
 
     def _lan(self, action: str) -> bool:
         """Signed control falls back to the local session the plugin exposes."""
