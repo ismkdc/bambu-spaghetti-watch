@@ -131,18 +131,18 @@ def test_settings_still_reaches_the_printer_in_cloud_mode(tmp_path, capsys, monk
     seen = {}
 
     async def fake_settings(cfg):
-        seen["host"] = cfg.host
+        seen["serial"] = cfg.serial
         return 0
 
-    monkeypatch.setattr(cli, "_with_discovery", lambda cfg: cfg)
+    monkeypatch.setattr(cli, "_with_cloud_config", lambda cfg: cfg)
     monkeypatch.setattr(cli, "settings", fake_settings)
 
     path = tmp_path / "config.json"
-    path.write_text(json.dumps({"host": "192.168.1.50", "camera_mode": "cloud"}))
+    path.write_text(json.dumps({"serial": "01S00A123456789", "camera_mode": "cloud"}))
 
     assert cli.main(["--config", str(path), "--settings"]) == 0
     assert "camera error" not in capsys.readouterr().out
-    assert seen["host"] == "192.168.1.50"
+    assert seen["serial"] == "01S00A123456789"
 
 
 def test_probe_reports_an_unconfigured_camera_instead_of_raising(monkeypatch, capsys):
@@ -166,7 +166,7 @@ def test_probe_reports_an_unconfigured_camera_instead_of_raising(monkeypatch, ca
     from bambu_spaghetti_watch.camera import cloud
 
     monkeypatch.setattr(cloud, "_bridge_dir", lambda: None)
-    monkeypatch.setattr(cli, "PrinterClient", lambda *args, **kwargs: FakePrinter())
+    monkeypatch.setattr(cli, "CloudPrinter", lambda *args, **kwargs: FakePrinter())
     monkeypatch.setattr(cli, "make_camera", lambda *args, **kwargs: CloudCamera())
 
     cfg = Config(host="h", serial="s", access_code="a")

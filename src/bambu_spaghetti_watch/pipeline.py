@@ -35,6 +35,13 @@ def send_control(printer: Any, control: Control | None, action: str) -> tuple[bo
     HMS 0500-0500-0001-0007 on the printer's screen. When we know the printer
     verifies, the signed plugin path is the only correct one.
     """
+    if getattr(printer, "signed_control", False):
+        if action == "pause":
+            return (True, "") if printer.pause() else (False, "cloud pause was rejected")
+        if action == "resume":
+            return (True, "") if printer.resume() else (False, "cloud resume was rejected")
+        return False, f"unsupported action {action!r}"
+
     if getattr(printer, "developer_mode", None) is False:
         if control is None:
             return False, (
@@ -117,6 +124,13 @@ class Pipeline:
 
         return verdict
 
+    async def snapshot(self) -> bytes | None:
+        """One frame on demand, even while the printer is idle."""
+        frame = await self._grab()
+        if frame is not None:
+            self.last_frame = frame
+        return frame
+
     async def _grab(self) -> bytes | None:
         """A camera with no working configuration is terminal, not per-tick noise."""
         try:
@@ -139,9 +153,10 @@ class Pipeline:
         if self.cfg.failure_action != "none":
             self.action("failure", reading.score)
 
-        # "stop" is not wired to a stop command yet; pausing is the safer
-        # failure mode for a detection that could still be a false positive.
-        if self.cfg.failure_action in ("pause", "stop"):
+        if self.cfg.failure_action == "stop" and hasattr(self.printer, "stop_print"):
+            ok = bool(self.printer.stop_print())
+            message = "" if ok else "cloud stop was rejected"
+        elif self.cfg.failure_action in ("pause", "stop"):
             # A verified printer rejects unsigned control commands and raises
             # HMS 0500-0500-0001-0007 on its own screen. Sending anyway only
             # litters the printer with errors, so refuse when we can tell.

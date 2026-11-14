@@ -150,10 +150,17 @@ class MenuBarApp:
     def _show_frame(self, _sender: Any) -> None:
         frame = getattr(self.pipeline, "last_frame", None)
         if not frame:
+            # The loop only grabs while a job is running; this menu item is a
+            # way to check the camera (and the mint) at any time.
+            try:
+                frame = self._runner.run(self.pipeline.snapshot(), timeout=45)
+            except Exception:
+                frame = None
+        if not frame:
             self._rumps.alert(
                 "No frame yet",
                 "The cloud live view returned no frame. Run `bambu-watch --probe` "
-                "to see whether the MQTT, camera or model layer failed.",
+                "to see whether the cloud session, camera or model layer failed.",
             )
             return
         FRAME_DIR.mkdir(parents=True, exist_ok=True)

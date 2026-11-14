@@ -1,5 +1,9 @@
-"""Command line entry point: run the menu bar app, or probe the hardware."""
+"""Command line entry point: run the menu bar app, or probe the hardware.
 
+Everything goes through Bambu's cloud session: status, camera and control. The
+printer's LAN address is not used, so the app starts at login without a local
+network permission and works from another network too.
+"""
 from __future__ import annotations
 
 import argparse
@@ -12,14 +16,14 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from bambu_spaghetti_watch import cloud_control
-from bambu_spaghetti_watch.bootstrap import BootstrapError, resolve
+from bambu_spaghetti_watch import host_identity
+from bambu_spaghetti_watch.bootstrap import BootstrapError, resolve_cloud
 from bambu_spaghetti_watch.camera import make_camera
 from bambu_spaghetti_watch.camera.base import CameraNotConfigured
+from bambu_spaghetti_watch.cloud_printer import CloudPrinter
 from bambu_spaghetti_watch.config import DEFAULT_CONFIG_PATH, Config, load_config
 from bambu_spaghetti_watch.detector import Detector
 from bambu_spaghetti_watch.pipeline import Pipeline
-from bambu_spaghetti_watch.printer import PrinterClient
 
 PROBE_WAIT_SECONDS = 30.0
 
@@ -59,7 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--probe",
         action="store_true",
-        help="check MQTT, camera and model against the real printer, then exit",
+        help="check the cloud session, camera and model, then exit",
     )
     parser.add_argument(
         "--settings",
@@ -79,7 +83,7 @@ SETTINGS_WAIT_SECONDS = 15.0
 
 
 async def wait_for_report(printer: Any, timeout: float, poll: float = 0.25) -> bool:
-    """Wait for the first status report; a fixed sleep races the broker."""
+    """Wait for the first status report; a fixed sleep races the cloud."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if printer.state is not None:
@@ -101,30 +105,23 @@ def model_paths(cfg: Config) -> tuple[Path, Path]:
     return base / "model.cfg", base / "model-weights.darknet"
 
 
-def _mask(code: str) -> str:
-    return code[:2] + "*" * max(0, len(code) - 2)
-
-
 async def probe(cfg: Config) -> int:
-    print(f"printer   : {cfg.host} ({cfg.serial})")
-    print(f"access    : {_mask(cfg.access_code)}")
+    print(f"printer   : {cfg.serial} (cloud)")
     print(f"camera    : {cfg.camera_mode}")
     print()
 
-    printer = PrinterClient(cfg.host, cfg.serial, cfg.access_code)
+    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model)
     printer.start()
-    print(f"mqtt      : connecting to {cfg.host}:{printer.port} ...")
+    print("cloud     : connecting to the Bambu account ...")
 
     if not await wait_for_report(printer, PROBE_WAIT_SECONDS):
-        pass
-
-    if printer.state is None:
-        print("mqtt      : no status received — check host and access code")
+        print("cloud     : no status received — "
+              f"{printer.last_error or 'check the Bambu Studio session'}")
         printer.stop()
         return 1
 
     model = printer.machine or cfg.model
-    print(f"mqtt      : ok, state={printer.state} machine={model}")
+    print(f"cloud     : ok, state={printer.state} machine={model}")
 
     camera = make_camera(cfg, model)
     problem = getattr(camera, "configuration_problem", None)
@@ -146,7 +143,7 @@ async def probe(cfg: Config) -> int:
         detail = getattr(camera, "last_error", None)
         if detail:
             print(f"            {detail}")
-        print("            check the cloud session in Bambu Studio and the installed plugin")
+        print("            check the Bambu Studio session and the installed plugin")
         printer.stop()
         return 1
 
@@ -176,7 +173,7 @@ async def probe(cfg: Config) -> int:
 
 
 async def settings(cfg: Config) -> int:
-    printer = PrinterClient(cfg.host, cfg.serial, cfg.access_code)
+    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model)
     printer.start()
 
     deadline = time.monotonic() + SETTINGS_WAIT_SECONDS
@@ -187,7 +184,7 @@ async def settings(cfg: Config) -> int:
 
     blocks = summarise_settings(printer.last_raw)
     if not blocks:
-        print("no settings received — check host and access code")
+        print("no settings received — check the Bambu Studio session")
         printer.stop()
         return 1
 
@@ -206,10 +203,10 @@ async def once(cfg: Config) -> int:
         print(f"missing model files in {weights_path.parent}")
         return 2
 
-    printer = PrinterClient(cfg.host, cfg.serial, cfg.access_code)
+    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model)
     printer.start()
     if not await wait_for_report(printer, PROBE_WAIT_SECONDS):
-        print("no status received — check host and access code")
+        print("no status received — check the Bambu Studio session")
         printer.stop()
         return 1
 
@@ -219,7 +216,7 @@ async def once(cfg: Config) -> int:
         Detector.load(cfg_path, weights_path),
         printer,
         action=lambda verdict, score: print(f"action: {verdict} (score {score:.2f})"),
-        control=lambda act, job: cloud_control.run(act, cfg.host, cfg.serial, job),
+        control=None,
     )
 
     verdict = await pipeline.step()
@@ -228,31 +225,24 @@ async def once(cfg: Config) -> int:
     return 0
 
 
-def _with_discovery(cfg: Config) -> Config:
-    """Fill in whatever the config file left out, before anything connects."""
-    resolved = resolve(cfg)
+def cloud_camera_problem(cfg: Config) -> str | None:
+    """The reason this configuration cannot yield frames, if it is known already."""
+    return getattr(make_camera(cfg), "configuration_problem", None)
+
+
+def _with_cloud_config(cfg: Config) -> Config:
+    """Fill in the serial (and access code) from the config file or Studio."""
+    resolved = resolve_cloud(cfg)
     return replace(
         cfg,
-        host=resolved.host,
         serial=resolved.serial,
         access_code=resolved.access_code,
         model=resolved.model,
     )
 
 
-def cloud_camera_problem(cfg: Config) -> str | None:
-    """The reason this configuration cannot yield frames, if it is known already.
-
-    The answer comes from the camera itself, so a future working implementation
-    unblocks the CLI by clearing ``configuration_problem`` in its own module —
-    no edit here, in the factory or in the loop. Checked before discovery: a
-    configuration that can never work should say so immediately instead of
-    waiting on SSDP and then failing inside the detection loop.
-    """
-    return getattr(make_camera(cfg), "configuration_problem", None)
-
-
 def main(argv: list[str] | None = None) -> int:
+    host_identity.ensure()
     _setup_logging()
     args = build_parser().parse_args(argv)
     path = Path(args.config)
@@ -267,7 +257,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"config error: {err}")
         return 2
 
-    # --settings only reads MQTT, so it must keep working without a camera.
     if not args.settings:
         problem = cloud_camera_problem(cfg)
         if problem:
@@ -275,9 +264,9 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     try:
-        cfg = _with_discovery(cfg)
+        cfg = _with_cloud_config(cfg)
     except BootstrapError as err:
-        print(f"discovery failed: {err}")
+        print(f"printer error: {err}")
         return 2
 
     if args.settings:
@@ -294,7 +283,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"missing model files in {weights_path.parent}")
         return 2
 
-    printer = PrinterClient(cfg.host, cfg.serial, cfg.access_code)
+    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model)
     printer.start()
 
     pipeline = Pipeline(
@@ -303,14 +292,9 @@ def main(argv: list[str] | None = None) -> int:
         Detector.load(cfg_path, weights_path),
         printer,
         action=_notify,
-        control=lambda act, job: cloud_control.run(act, cfg.host, cfg.serial, job),
+        control=None,
     )
-    MenuBarApp(
-        cfg,
-        pipeline,
-        printer,
-        control=lambda act, job: cloud_control.run(act, cfg.host, cfg.serial, job),
-    ).run()
+    MenuBarApp(cfg, pipeline, printer, control=None).run()
     return 0
 
 

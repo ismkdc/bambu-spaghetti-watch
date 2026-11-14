@@ -54,16 +54,20 @@ minutes and re-minted on failure.
 be on the same network. That is the library's choice for a TUTK ticket; the URL
 is still the cloud one and works remotely.
 
-## Signed control
+## Cloud session (status and control)
 
-`src/bambu_spaghetti_watch/cloud_control.py` calls the vendored
-[`bambu-headless`](https://github.com/danielyaa5/bambu-headless) CLI, which
-loads the same plugin, performs the certificate bring-up and dispatches a signed
-`pause`/`resume`/`stop`.
+`src/bambu_spaghetti_watch/plugin.py` wraps `libbswbridge` and
+`cloud_printer.py` drives the same plugin Studio does: create agent, callbacks,
+certificate file, header map, `start`, `connect_server`, device table, selected
+machine. It reads `push_status` from the cloud and sends `pause`/`resume`/`stop`
+through `bambu_network_send_message_to_printer`, which the plugin signs.
 
-Firmware since 2025 rejects unsigned control commands with
-`84033543 mqtt message verify failed`, so this route is the only one that works
-without Developer Mode.
+`src/bambu_spaghetti_watch/host_identity.py` re-execs the app under the
+executable-path shim before the plugin is opened, so the plugin produces the
+signed request.
+
+The plugin's incremental `push_status` omits `gcode_state`; the app sends a
+`pushall` after the certificate exchange and reads the full report.
 
 ## Files
 

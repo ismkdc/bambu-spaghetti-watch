@@ -12,7 +12,7 @@ def test_loads_minimal_config(tmp_path):
     cfg = load_config(p)
     assert cfg.host == "192.168.1.50"
     assert cfg.interval_sec == 5
-    assert cfg.failure_action == "notify"
+    assert cfg.failure_action == "stop"
     assert cfg.camera_mode == "cloud"
     assert cfg.sensitivity == "medium"
 

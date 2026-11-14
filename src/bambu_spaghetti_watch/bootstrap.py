@@ -100,6 +100,29 @@ def read_studio_access_codes(path: Path = STUDIO_CONF) -> dict[str, str]:
     return {str(k): str(v) for k, v in codes.items() if isinstance(v, str) and v}
 
 
+def read_studio_serials(path: Path = STUDIO_CONF) -> list[str]:
+    """Every printer serial Studio has saved, in either access-code map."""
+    try:
+        data = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return []
+    out: list[str] = []
+    for key in ("access_code", "user_access_code"):
+        block = data.get(key)
+        if isinstance(block, dict):
+            out.extend(str(k) for k, v in block.items() if isinstance(v, str) and v)
+    return list(dict.fromkeys(out))
+
+
+def read_studio_slicer_uuid(path: Path = STUDIO_CONF) -> str:
+    try:
+        data = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return ""
+    app = data.get("app")
+    return str(app.get("slicer_uuid", "")) if isinstance(app, dict) else ""
+
+
 def _cache_read() -> PrinterInfo | None:
     try:
         data = json.loads(CACHE.read_text())
@@ -233,3 +256,29 @@ def resolve(cfg: Any) -> Resolved:
 
     _cache_write(PrinterInfo(host=host, serial=serial, model=model))
     return Resolved(host=host, serial=serial, access_code=access, model=model)
+
+
+def resolve_cloud(cfg: Any) -> Resolved:
+    """Cloud-only resolution: serial and model from the config or Studio.
+
+    No SSDP and no printer address are needed. The networking plugin holds the
+    account session and finds the printer through Bambu's cloud.
+    """
+    serial = (getattr(cfg, "serial", "") or "").strip()
+    if not serial:
+        serials = read_studio_serials()
+        if not serials:
+            raise BootstrapError(
+                "no printer saved in Bambu Studio; add one there, or set 'serial'"
+            )
+        if len(serials) > 1:
+            raise BootstrapError(
+                "several printers saved in Bambu Studio; set 'serial' in the config"
+            )
+        serial = serials[0]
+
+    access = (getattr(cfg, "access_code", "") or "").strip()
+    if not access:
+        access = read_studio_access_codes().get(serial, "")
+    model = (getattr(cfg, "model", "auto") or "auto").strip()
+    return Resolved(host="", serial=serial, access_code=access, model=model)

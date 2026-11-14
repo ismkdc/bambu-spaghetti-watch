@@ -94,8 +94,6 @@ class Bridge:
             "bsw_install_device_cert": ([c, ctypes.c_char_p, ctypes.c_int], ctypes.c_int),
             "bsw_camera_url": ([c, ctypes.c_char_p, ctypes.c_int], ctypes.c_int),
             "bsw_camera_url_result": ([], ctypes.c_char_p),
-            "bsw_connect": ([c, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int], ctypes.c_int),
-            "bsw_connected": ([], ctypes.c_int),
             "bsw_buffer": ([], ctypes.c_char_p),
             "bsw_buffer_contains": ([ctypes.c_char_p], ctypes.c_int),
             "bsw_last_error": ([], ctypes.c_char_p),
@@ -130,8 +128,7 @@ def self_attach_flag_hook() -> object | None:
 def mint(serial: str, *, dev_ver: str = "01.03.00.00",
          protocols: str = '"tutk","agora"', timeout: float = 40.0,
          wait: float = 0.5, cert_tries: int = 1, force_flag: bool = True,
-         skip_cert: bool = False, connect: bool = False,
-         ip: str = "192.168.1.50", no_headers: bool = False,
+         skip_cert: bool = False, no_headers: bool = False,
          verbose: bool = False) -> str | None:
     def log(message: str) -> None:
         if verbose:
@@ -181,16 +178,6 @@ def mint(serial: str, *, dev_ver: str = "01.03.00.00",
 
         log(f"select   : {b.lib.bsw_select_machine(agent, serial.encode())}")
 
-        if connect:
-            code = access_code(serial)
-            if not code:
-                raise SystemExit(f"no saved access code for {serial}")
-            log(f"connect  : {b.lib.bsw_connect(agent, serial.encode(), ip.encode(), b'bblp', code.encode(), 1)}")
-            deadline = time.monotonic() + 20
-            while time.monotonic() < deadline and not b.lib.bsw_connected():
-                time.sleep(0.5)
-            log(f"connected: {b.lib.bsw_connected()}")
-
         if not skip_cert:
             installed = False
             for attempt in range(1, max(1, cert_tries) + 1):
@@ -235,10 +222,8 @@ def main() -> int:
     ap.add_argument("--skip-cert", action="store_true")
     ap.add_argument("--no-force-flag", action="store_true")
     ap.add_argument("--pause", type=float, default=0.0)
-    ap.add_argument("--connect", action="store_true")
     ap.add_argument("--no-shim", action="store_true")
     ap.add_argument("--no-headers", action="store_true")
-    ap.add_argument("--ip", default="192.168.1.50")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -252,8 +237,7 @@ def main() -> int:
     url = mint(serial, dev_ver=args.dev_ver,
                protocols=args.protocols, timeout=args.timeout, wait=args.wait,
                cert_tries=args.cert_tries, force_flag=not args.no_force_flag,
-               skip_cert=args.skip_cert, connect=args.connect, ip=args.ip,
-               no_headers=args.no_headers, verbose=True)
+               skip_cert=args.skip_cert, no_headers=args.no_headers, verbose=True)
     if not url:
         return 1
     print(url)

@@ -95,6 +95,7 @@ const char* bsw_last_message(void) { return g_last_message.c_str(); }
 int bsw_message_count(void) { return g_message_count; }
 int bsw_connected(void) { return g_connected; }
 const char* bsw_buffer(void) { return g_buffer.c_str(); }
+void bsw_clear_buffer(void) { g_buffer.clear(); }
 
 int bsw_buffer_contains(const char* needle) {
     if (needle == nullptr) return 0;
@@ -114,6 +115,16 @@ int bsw_connect(void* agent, const char* dev_id, const char* ip, const char* use
     }
     return fn(agent, std::string(dev_id), std::string(ip), std::string(user),
               std::string(pass), use_ssl != 0);
+}
+
+// The cloud/general message path; send_message_to_printer is the local one.
+int bsw_send_message(void* agent, const char* dev_id, const char* json, int qos, int flag) {
+    auto fn = symbol<send_to_printer_fn>("bambu_network_send_message");
+    if (fn == nullptr || agent == nullptr) {
+        g_last_error = "bambu_network_send_message not found";
+        return -1;
+    }
+    return fn(agent, std::string(dev_id), std::string(json), qos, flag);
 }
 
 int bsw_send(void* agent, const char* dev_id, const char* json, int qos, int flag) {
