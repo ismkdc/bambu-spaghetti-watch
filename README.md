@@ -47,7 +47,9 @@ already installed by Bambu Studio.
 - Python 3.12 (`/opt/homebrew/bin/python3.12`)
 - Xcode Command Line Tools (`xcode-select --install`)
 - `ffmpeg` and `nlohmann-json` (`brew install ffmpeg nlohmann-json`)
-- Bambu Studio installed, signed in, with the printer bound to the account
+- Bambu Studio installed, signed in, with the printer **bound to your Bambu
+  account** (the camera is Bambu's cloud live view; a LAN-only printer has no
+  camera here)
 - The printer reachable on the LAN for status and control (directly or over VPN)
 
 ## Install
@@ -128,7 +130,7 @@ launchctl load ~/Library/LaunchAgents/io.github.bambu-spaghetti-watch.plist
 | `no status received` | wrong access code, or printer not in LAN mode | check the code on the printer screen |
 | `no status received` as a discovery error | several printers answered SSDP | set `serial` in the config |
 | `camera error: ... bridge ...` | `bridge/` was not built or moved | run `./bridge/build.sh` |
-| `cloud camera could not mint a live-view URL` | Studio session expired, printer offline, or the plugin ABI changed | open Bambu Studio once, confirm the printer is online, re-run `--probe` |
+| `cloud camera could not mint a live-view URL` | Studio session expired, printer offline, not cloud-bound, or the plugin ABI changed | open Bambu Studio once, confirm the printer is online and bound to your account, re-run `--probe` |
 | `cloud camera returned no frame` | the minted ticket aged out, or the tunnel was refused | delete `~/Library/Caches/bambu-watch/liveview_url.txt` and retry |
 | Frequent false positives | thresholds tuned for different lighting | lower `sensitivity` |
 
