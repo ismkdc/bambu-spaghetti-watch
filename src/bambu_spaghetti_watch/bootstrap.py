@@ -261,7 +261,9 @@ def resolve(cfg: Any) -> Resolved:
 def resolve_lan_host(serial: str = "") -> str:
     """LAN address for signed control, from the cache or one SSDP round."""
     cached = _cache_read()
-    if cached and (not serial or cached.serial == serial) and _reachable(cached.host):
+    if cached and (not serial or cached.serial == serial):
+        # No reachability probe here: launchd may deny local-network access,
+        # and the control call reports the real error instead of a blank host.
         return cached.host
     devices = discover(timeout=3.0)
     chosen = choose_device(devices, serial or None)
