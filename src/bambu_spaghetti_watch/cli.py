@@ -283,7 +283,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"missing model files in {weights_path.parent}")
         return 2
 
-    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model, start_delay=20.0)
+    printer = CloudPrinter(cfg.serial, cfg.access_code, cfg.model)
     printer.start()
 
     pipeline = Pipeline(

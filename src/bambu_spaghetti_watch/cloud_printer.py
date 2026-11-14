@@ -89,8 +89,8 @@ class CloudPrinter:
 
     def _run(self) -> None:
         if self._start_delay:
-            # Let a login-item Bambu Studio open and take the cloud session first.
-            time.sleep(self._start_delay)
+            delay, self._start_delay = self._start_delay, 0.0
+            time.sleep(delay)
         while self._running:
             try:
                 self._connect()

@@ -121,71 +121,40 @@ class MenuBarApp:
         self._studio_watcher.start()
 
     def _watch_studio(self) -> None:
-        """Release the cloud session while Bambu Studio is open.
+        """Release the cloud session only while Bambu Studio is starting.
 
-        The Bambu cloud allows one session per account, and Studio cannot start
-        while this process holds it. Watching the process means Studio opens
-        normally, and the agent reconnects when it quits.
+        Studio cannot launch while this process holds the session, but it can
+        share it once its own login has finished. So: on a new Studio process,
+        release, let it start, then reconnect while Studio stays open.
         """
-        running = None
-        while True:
+        def studio_running() -> bool:
             try:
-                now = subprocess.run(
+                return subprocess.run(
                     ["pgrep", "-f", STUDIO_PATH], stdout=subprocess.DEVNULL
                 ).returncode == 0
             except OSError:
-                now = False
-            if now != running:
-                if now:
-                    LOGGER.info("Bambu Studio detected; releasing the cloud session")
-                    try:
-                        self.printer.stop()
-                    except Exception:
-                        LOGGER.exception("could not stop the cloud printer")
-                elif running:
-                    LOGGER.info("Bambu Studio closed; reconnecting")
-                    try:
-                        self.printer.start()
-                    except Exception:
-                        LOGGER.exception("could not restart the cloud printer")
-            running = now
+                return False
+
+        was = studio_running()
+        while True:
             time.sleep(1.0)
-
-    def _set_symbol(self, name: str) -> None:
-        """Swap the status item image for an SF Symbol, template-tinted."""
-        try:
-            from AppKit import NSImage
-
-            image = NSImage.imageWithSystemSymbolName_accessibilityDescription_(name, None)
-            if image is not None:
-                image.setTemplate_(True)
-                self._app._icon = image
-                self._app._nsapp.nsstatusitem.button().setImage_(image)
-        except Exception:  # symbol unavailable on this macOS: text glyph stays
-            LOGGER.debug("could not set status symbol %s", name, exc_info=True)
-
-    def _tick(self, _sender: Any) -> None:
-        try:
-            verdict = self._runner.run(
-                self.pipeline.step(), timeout=max(30.0, self.cfg.interval_sec * 4)
-            )
-        except Exception as err:  # a dead camera must not kill the menu bar
-            LOGGER.exception("detection step failed")
-            self._app.title = ICONS["error"]
-            self._status_item.title = f"Status: error ({err})"
-            return
-
-        status = "idle" if verdict == "idle" else "watching"
-        if verdict == "no_frame":
-            status = "error"
-
-        self._set_symbol(symbol_for(status, verdict))
-        self._status_item.title = f"Status: {verdict}"
-        self._score_item.title = f"Failure score: {self.pipeline.decision.last.score:.2f}"
-
-        # Notifications belong to the pipeline's action, which is cooldown
-        # gated and stays silent for failure_action "none". Firing here would
-        # notify on every failing frame instead of once per incident.
+            now = studio_running()
+            if now and not was:
+                LOGGER.info("Bambu Studio launched; releasing the cloud session")
+                try:
+                    self.printer.stop()
+                except Exception:
+                    LOGGER.exception("could not stop the cloud printer")
+                for _ in range(25):
+                    time.sleep(1.0)
+                    if not studio_running():
+                        break
+                LOGGER.info("Bambu Studio is up; reconnecting the cloud session")
+                try:
+                    self.printer.start()
+                except Exception:
+                    LOGGER.exception("could not restart the cloud printer")
+            was = now
 
     def _pause_watching(self, _sender: Any) -> None:
         """Release the cloud session so Bambu Studio can start.
