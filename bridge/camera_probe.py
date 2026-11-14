@@ -27,6 +27,8 @@ from pathlib import Path
 
 HOME = Path.home()
 STUDIO = HOME / "Library/Application Support/BambuStudio"
+# Keep the agent out of Studio's config dir (it writes state and takes locks).
+AGENT_DIR = HOME / "Library/Application Support/BambuSpaghettiWatch"
 PLUGIN = STUDIO / "plugins/libbambu_networking.dylib"
 STUDIO_CERT = Path("/Applications/BambuStudio.app/Contents/Resources/cert")
 BRIDGE = Path(__file__).with_name("libbswbridge.dylib")
@@ -52,6 +54,26 @@ def ensure_host_identity(no_shim: bool = False) -> None:
     env["H2D_STUDIO_EXECUTABLE"] = STUDIO_EXE
     env["BSW_SHIM"] = "1"
     os.execve(sys.executable, [sys.executable] + sys.argv, env)
+
+
+def _seed_agent_dir() -> None:
+    try:
+        AGENT_DIR.mkdir(parents=True, exist_ok=True)
+        for name in ("BambuStudio.conf", "BambuNetworkEngine.conf"):
+            source = STUDIO / name
+            target = AGENT_DIR / name
+            if source.exists() and (not target.exists()
+                                    or source.stat().st_mtime > target.stat().st_mtime):
+                target.write_bytes(source.read_bytes())
+        source_certs = STUDIO / "certs"
+        target_certs = AGENT_DIR / "certs"
+        if source_certs.is_dir():
+            target_certs.mkdir(parents=True, exist_ok=True)
+            for path in source_certs.iterdir():
+                if path.is_file() and not (target_certs / path.name).exists():
+                    (target_certs / path.name).write_bytes(path.read_bytes())
+    except OSError:
+        pass
 
 
 def conf() -> dict:
@@ -142,8 +164,9 @@ def mint(serial: str, *, dev_ver: str = "01.03.00.00",
 
     session = None
     log_dir = Path(tempfile.mkdtemp(prefix="bsw-log-"))
+    _seed_agent_dir()
     agent = b.lib.bsw_create_agent(str(PLUGIN).encode(), str(log_dir).encode(),
-                                   str(STUDIO).encode())
+                                   str(AGENT_DIR).encode())
     if not agent:
         log(f"create_agent failed: {b.err()}")
         return None

@@ -18,7 +18,32 @@ PLUGIN = (
     / "libbambu_networking.dylib"
 )
 STUDIO = Path.home() / "Library" / "Application Support" / "BambuStudio"
+# The plugin writes BambuNetworkEngine.conf and takes locks inside its config
+# directory. Point the agent at a copy so Studio and the agent can run together.
+AGENT_DIR = Path.home() / "Library" / "Application Support" / "BambuSpaghettiWatch"
 CERT = Path("/Applications/BambuStudio.app/Contents/Resources/cert")
+
+
+def agent_config_dir() -> Path:
+    """A private config dir seeded from Studio's, so both can run at once."""
+    try:
+        AGENT_DIR.mkdir(parents=True, exist_ok=True)
+        for name in ("BambuStudio.conf", "BambuNetworkEngine.conf"):
+            source = STUDIO / name
+            target = AGENT_DIR / name
+            if source.exists() and (not target.exists()
+                                    or source.stat().st_mtime > target.stat().st_mtime):
+                target.write_bytes(source.read_bytes())
+        source_certs = STUDIO / "certs"
+        target_certs = AGENT_DIR / "certs"
+        if source_certs.is_dir():
+            target_certs.mkdir(parents=True, exist_ok=True)
+            for path in source_certs.iterdir():
+                if path.is_file() and not (target_certs / path.name).exists():
+                    (target_certs / path.name).write_bytes(path.read_bytes())
+    except OSError:
+        pass
+    return AGENT_DIR
 
 
 class Bridge:
@@ -65,7 +90,7 @@ class Bridge:
         return self.lib.bsw_create_agent(
             str(PLUGIN).encode(),
             (log_dir or tempfile.mkdtemp(prefix="bsw-app-")).encode(),
-            str(STUDIO).encode(),
+            str(agent_config_dir()).encode(),
         )
 
     def setup_cloud(self, agent) -> int:
