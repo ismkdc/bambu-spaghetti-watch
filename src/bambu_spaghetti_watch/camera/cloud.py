@@ -102,7 +102,8 @@ class CloudCamera:
         bridge = _bridge_dir()
         if bridge is None:
             return None
-        command = [sys.executable, str(bridge / "camera_probe.py"),
+        python = os.environ.get("BSW_PYTHON", sys.executable)
+        command = [python, str(bridge / "camera_probe.py"),
                    "--timeout", "30", "--out", str(CACHE)]
         serial = getattr(self.cfg, "serial", None) if self.cfg is not None else None
         if serial:

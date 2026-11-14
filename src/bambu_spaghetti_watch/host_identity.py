@@ -37,4 +37,7 @@ def ensure() -> None:
     env["DYLD_INSERT_LIBRARIES"] = str(SHIM)
     env["H2D_STUDIO_EXECUTABLE"] = STUDIO_EXE
     env["BSW_SHIM"] = "1"
+    # Under the shim sys.executable becomes the Studio binary; keep the real
+    # interpreter path for subprocesses.
+    env["BSW_PYTHON"] = sys.executable
     os.execve(sys.executable, [sys.executable] + sys.argv, env)
