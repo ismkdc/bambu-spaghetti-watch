@@ -26,6 +26,10 @@ POLL_SECONDS = 0.5
 # The cloud's incremental push_status omits gcode_state; progress fields mean
 # the printer is working. After this long without one, treat it as idle again.
 STALE_SECONDS = 180.0
+# Bambu Studio needs the same cloud session. While idle the agent releases it
+# and only wakes every IDLE_POLL_SECONDS to look for a new job.
+IDLE_RELEASE_SECONDS = 30.0
+IDLE_POLL_SECONDS = 30.0
 
 
 class CloudPrinter:
@@ -52,6 +56,7 @@ class CloudPrinter:
         self._seen_report = False
         self._start_delay = start_delay
         self._last_progress = 0.0
+        self._connected_at = 0.0
 
     @property
     def state(self) -> str | None:
@@ -98,7 +103,9 @@ class CloudPrinter:
             finally:
                 self._teardown()
             if self._running:
-                time.sleep(5.0)
+                delay = IDLE_POLL_SECONDS if self._state != "RUNNING" else 5.0
+                LOGGER.info("next cloud attempt in %.0fs (state=%s)", delay, self._state)
+                time.sleep(delay)
 
     def _connect(self) -> None:
         bridge = plugin.Bridge()
@@ -134,6 +141,7 @@ class CloudPrinter:
         bridge.send(agent, self.serial,
                     '{"pushing":{"sequence_id":"0","command":"pushall","version":1,"push_target":1}}',
                     1, 0)
+        self._connected_at = time.monotonic()
         LOGGER.info("polling")
 
     def _teardown(self) -> None:
@@ -172,6 +180,11 @@ class CloudPrinter:
                         self._consume(line)
             except Exception as err:
                 self.last_error = str(err)
+            if self._state != "RUNNING":
+                last = self._last_progress or self._connected_at
+                if last and time.monotonic() - last > IDLE_RELEASE_SECONDS:
+                    LOGGER.info("idle; releasing the cloud session for Bambu Studio")
+                    return
             time.sleep(POLL_SECONDS)
 
     def _consume(self, line: str) -> None:
