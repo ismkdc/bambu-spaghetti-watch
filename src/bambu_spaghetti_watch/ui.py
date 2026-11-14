@@ -31,6 +31,7 @@ SYMBOLS = {
 }
 
 APP_NAME = "Bambu Spaghetti Watch"
+STUDIO_PATH = "/Applications/BambuStudio.app/Contents/MacOS/BambuStudio"
 FRAME_DIR = Path.home() / "Library" / "Logs" / "bambu-spaghetti-watch"
 
 LOGGER = logging.getLogger(__name__)
@@ -114,6 +115,41 @@ class MenuBarApp:
         self._runner = LoopRunner()
         self._paused_for_studio = False
         self._set_symbol(symbol_for("idle", "safe"))
+        self._studio_watcher = threading.Thread(
+            target=self._watch_studio, name="studio-watch", daemon=True
+        )
+        self._studio_watcher.start()
+
+    def _watch_studio(self) -> None:
+        """Release the cloud session while Bambu Studio is open.
+
+        The Bambu cloud allows one session per account, and Studio cannot start
+        while this process holds it. Watching the process means Studio opens
+        normally, and the agent reconnects when it quits.
+        """
+        running = None
+        while True:
+            try:
+                now = subprocess.run(
+                    ["pgrep", "-f", STUDIO_PATH], stdout=subprocess.DEVNULL
+                ).returncode == 0
+            except OSError:
+                now = False
+            if now != running:
+                if now:
+                    LOGGER.info("Bambu Studio detected; releasing the cloud session")
+                    try:
+                        self.printer.stop()
+                    except Exception:
+                        LOGGER.exception("could not stop the cloud printer")
+                elif running:
+                    LOGGER.info("Bambu Studio closed; reconnecting")
+                    try:
+                        self.printer.start()
+                    except Exception:
+                        LOGGER.exception("could not restart the cloud printer")
+            running = now
+            time.sleep(1.0)
 
     def _set_symbol(self, name: str) -> None:
         """Swap the status item image for an SF Symbol, template-tinted."""
